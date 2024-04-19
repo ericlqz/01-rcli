@@ -1,7 +1,10 @@
 use anyhow::Result;
 use csv::Reader;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::fs;
+
+use crate::opts::OutputFormat;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Player {
@@ -17,15 +20,27 @@ pub struct Player {
     kit: u8,
 }
 
-pub fn process_csv(input: &str, output: &str) -> Result<()> {
+pub fn process_csv(input: &str, output: String, output_format: OutputFormat) -> Result<()> {
     let mut reader = Reader::from_path(input).unwrap();
-    let players = reader
-        .deserialize()
-        .map(|record| record.unwrap())
-        .collect::<Vec<Player>>();
+    // let players = reader
+    //     .deserialize()
+    //     .map(|record| record.unwrap())
+    //     .collect::<Vec<Player>>();
 
-    let json = serde_json::to_string_pretty(&players)?;
-    fs::write(output, json)?;
+    let mut ret = Vec::with_capacity(128);
+    let headers = reader.headers()?.clone();
+
+    for des_read in reader.records() {
+        let record = des_read?;
+        let json_record = headers.iter().zip(record.iter()).collect::<Value>();
+        ret.push(json_record);
+    }
+
+    let content = match output_format {
+        OutputFormat::Json => serde_json::to_string_pretty(&ret)?,
+        OutputFormat::Yaml => serde_yaml::to_string(&ret)?,
+    };
+    fs::write(output, content)?;
 
     Ok(())
 }
