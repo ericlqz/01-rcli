@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 
-use crate::opts::OutputFormat;
+use crate::OutputFormat;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Player {
