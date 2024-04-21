@@ -1,13 +1,8 @@
-use std::{
-    fmt,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
-
 use anyhow::Result;
 use clap::Parser;
+use std::{fmt, path::PathBuf, str::FromStr};
 
-use super::verify_file;
+use super::{verify_file, verify_path};
 
 #[derive(Debug, Parser)]
 pub enum TextSubCommand {
@@ -59,17 +54,8 @@ pub struct GenerateOpts {
 
 #[derive(Debug, Clone, Copy, Parser)]
 pub enum TextSignFormat {
-    Blake3,
-    Ed25519,
-}
-
-pub fn verify_path(path: &str) -> Result<PathBuf, String> {
-    let p = Path::new(path);
-    if p.exists() && p.is_dir() {
-        Ok(path.into())
-    } else {
-        Err("File does not exists.".into())
-    }
+    Blake3,  // 哈希算法
+    Ed25519, // 数字签名算法
 }
 
 pub fn verify_format(ft: &str) -> Result<TextSignFormat, anyhow::Error> {
