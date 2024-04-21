@@ -1,10 +1,15 @@
 use anyhow::Result;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use clap::Parser;
-use std::{fmt, path::PathBuf, str::FromStr};
+use enum_dispatch::enum_dispatch;
+use std::{fmt, fs, path::PathBuf, str::FromStr};
+
+use crate::{process_key_generate, process_text_sign, process_text_verify, CmdExecutor};
 
 use super::{verify_file, verify_path};
 
 #[derive(Debug, Parser)]
+#[enum_dispatch(CmdExecutor)]
 pub enum TextSubCommand {
     #[command(about = "Sign a message with private/shared key")]
     Sign(TextSignOpts),
@@ -86,5 +91,40 @@ impl FromStr for TextSignFormat {
 impl fmt::Display for TextSignFormat {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "{}", Into::<&str>::into(*self))
+    }
+}
+
+impl CmdExecutor for TextSignOpts {
+    async fn execute(self) -> anyhow::Result<()> {
+        let signed = process_text_sign(&self.input, &self.key, self.format)?;
+        let signed = URL_SAFE_NO_PAD.encode(signed);
+        println!("{}", signed);
+        Ok(())
+    }
+}
+
+impl CmdExecutor for TextVerifyOpts {
+    async fn execute(self) -> anyhow::Result<()> {
+        let verified = process_text_verify(&self.input, &self.key, self.format, &self.sig)?;
+        println!("{}", verified);
+        Ok(())
+    }
+}
+
+impl CmdExecutor for GenerateOpts {
+    async fn execute(self) -> anyhow::Result<()> {
+        let keys = process_key_generate(self.format)?;
+        match self.format {
+            TextSignFormat::Blake3 => {
+                let name = self.output.join("blake3.txt");
+                fs::write(name, &keys[0])?;
+            }
+            TextSignFormat::Ed25519 => {
+                let name = self.output;
+                fs::write(name.join("ed25519.sk"), &keys[0])?;
+                fs::write(name.join("ed25519.pk"), &keys[1])?;
+            }
+        }
+        Ok(())
     }
 }

@@ -4,21 +4,17 @@ mod genpass;
 mod http;
 mod text;
 
+use clap::Parser;
+use enum_dispatch::enum_dispatch;
 use std::path::{Path, PathBuf};
 
-use clap::{Parser, Subcommand};
-
 pub use self::{
-    base64::{Base64Format, Base64SubCommand},
+    base64::{Base64DecodeOpts, Base64EncodeOpts, Base64Format, Base64SubCommand},
     csv::{CsvOpts, OutputFormat},
     genpass::GenPassOpts,
-    http::HttpSubCommand,
-    text::{TextSignFormat, TextSubCommand},
+    http::{HttpSubCommand, ServeOpts},
+    text::{GenerateOpts, TextSignFormat, TextSignOpts, TextSubCommand, TextVerifyOpts},
 };
-
-// pub use {self::base64::Base64Format, self::csv::OutputFormat};
-
-// rcli csv -i input.csv -o output.json --header -d ','
 
 #[derive(Debug, Parser)]
 #[command(name = "rcli", version, author, about, long_about = None)]
@@ -27,21 +23,22 @@ pub struct Opts {
     pub cmd: SubCommand,
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Parser)]
+#[enum_dispatch(CmdExecutor)]
 pub enum SubCommand {
     #[command(name = "csv", about = "Convert csv to another format")]
     Csv(CsvOpts),
 
-    #[command(name = "genpass", about = "Generate password")]
+    #[command(name = "genpass", about = "Generate a random password")]
     GenPass(GenPassOpts),
 
-    #[command(subcommand)]
+    #[command(subcommand, about = "Base64 encode/decode")]
     Base64(Base64SubCommand),
 
-    #[command(subcommand)]
+    #[command(subcommand, about = "Text sign/verify")]
     Text(TextSubCommand),
 
-    #[command(subcommand)]
+    #[command(subcommand, about = "HTTP server")]
     Http(HttpSubCommand),
 }
 
