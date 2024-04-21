@@ -4,7 +4,10 @@ use clap::Parser;
 use enum_dispatch::enum_dispatch;
 use std::{fmt, fs, path::PathBuf, str::FromStr};
 
-use crate::{process_key_generate, process_text_sign, process_text_verify, CmdExecutor};
+use crate::{
+    process_key_generate, process_text_decrypt, process_text_encrypt, process_text_sign,
+    process_text_verify, CmdExecutor,
+};
 
 use super::{verify_file, verify_path};
 
@@ -19,6 +22,12 @@ pub enum TextSubCommand {
 
     #[command(about = "Generate a new key")]
     Generate(GenerateOpts),
+
+    #[command(about = "Encrypt message")]
+    Encrypt(EncryptOpts),
+
+    #[command(about = "Decrypt message")]
+    Decrypt(DecryptOpts),
 }
 
 #[derive(Debug, Parser)]
@@ -55,6 +64,30 @@ pub struct GenerateOpts {
 
     #[arg(short, long, value_parser = verify_path)]
     pub output: PathBuf,
+}
+
+#[derive(Debug, Parser)]
+pub struct EncryptOpts {
+    #[arg(short, long, value_parser = verify_file, default_value = "-")]
+    pub input: String,
+
+    #[arg(long, default_value = "chacha20poly1305", value_parser = verify_encrypt_format)]
+    pub format: TextEncryptFormat,
+
+    #[arg(short, long, value_parser = verify_file)]
+    pub key: String,
+}
+
+#[derive(Debug, Parser)]
+pub struct DecryptOpts {
+    #[arg(short, long, value_parser = verify_file, default_value = "-")]
+    pub input: String,
+
+    #[arg(long, default_value = "chacha20poly1305", value_parser = verify_encrypt_format)]
+    pub format: TextEncryptFormat,
+
+    #[arg(short, long, value_parser = verify_file)]
+    pub key: String,
 }
 
 #[derive(Debug, Clone, Copy, Parser)]
@@ -94,6 +127,40 @@ impl fmt::Display for TextSignFormat {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum TextEncryptFormat {
+    ChaCha20Poly1305,
+}
+
+pub fn verify_encrypt_format(ft: &str) -> Result<TextEncryptFormat, anyhow::Error> {
+    ft.parse()
+}
+
+impl From<TextEncryptFormat> for &'static str {
+    fn from(format: TextEncryptFormat) -> Self {
+        match format {
+            TextEncryptFormat::ChaCha20Poly1305 => "chacha20poly1305",
+        }
+    }
+}
+
+impl FromStr for TextEncryptFormat {
+    type Err = anyhow::Error;
+
+    fn from_str(format: &str) -> Result<Self, Self::Err> {
+        match format.to_lowercase().as_str() {
+            "chacha20poly1305" => Ok(TextEncryptFormat::ChaCha20Poly1305),
+            v => anyhow::bail!("Unsupported format {:?}", v),
+        }
+    }
+}
+
+impl fmt::Display for TextEncryptFormat {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "{}", Into::<&str>::into(*self))
+    }
+}
+
 impl CmdExecutor for TextSignOpts {
     async fn execute(self) -> anyhow::Result<()> {
         let signed = process_text_sign(&self.input, &self.key, self.format)?;
@@ -125,6 +192,24 @@ impl CmdExecutor for GenerateOpts {
                 fs::write(name.join("ed25519.pk"), &keys[1])?;
             }
         }
+        Ok(())
+    }
+}
+
+impl CmdExecutor for EncryptOpts {
+    async fn execute(self) -> anyhow::Result<()> {
+        let encrypted = process_text_encrypt(&self.input, &self.key, self.format)?;
+        let encrypted = String::from_utf8(encrypted)?;
+        println!("{}", encrypted);
+        Ok(())
+    }
+}
+
+impl CmdExecutor for DecryptOpts {
+    async fn execute(self) -> anyhow::Result<()> {
+        let decrypted = process_text_decrypt(&self.input, &self.key, self.format)?;
+        let decrypted = String::from_utf8(decrypted)?;
+        println!("{}", decrypted);
         Ok(())
     }
 }

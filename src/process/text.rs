@@ -1,40 +1,14 @@
 use std::{fs, io::Read, path::Path};
 
-use crate::{process_genpass, read_data, TextSignFormat};
+use crate::{process_genpass, read_data, TextEncryptFormat, TextSignFormat};
 use anyhow::Result;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use chacha20poly1305::{
+    aead::{Aead, AeadCore, KeyInit, OsRng},
+    ChaCha20Poly1305, Key, Nonce,
+};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
-use rand::rngs::OsRng;
-
-pub trait TextSign {
-    fn sign(&self, reader: &mut dyn Read) -> Result<Vec<u8>>;
-}
-
-pub trait TextVerify {
-    fn verify(&self, reader: &mut dyn Read, sig: &[u8]) -> Result<bool>;
-}
-
-pub trait KeyLoader {
-    fn load(path: impl AsRef<Path>) -> Result<Self>
-    where
-        Self: Sized;
-}
-
-pub trait KeyGenerator {
-    fn generate() -> Result<Vec<Vec<u8>>>;
-}
-
-pub struct Blake3 {
-    key: [u8; 32],
-}
-
-pub struct Ed25519Signer {
-    key: SigningKey,
-}
-
-pub struct Ed25519Verifier {
-    key: VerifyingKey,
-}
+use serde::{Deserialize, Serialize};
 
 pub fn process_text_sign(input: &str, key: &str, format: TextSignFormat) -> Result<Vec<u8>> {
     let mut reader = read_data(input)?;
@@ -81,6 +55,93 @@ pub fn process_key_generate(format: TextSignFormat) -> Result<Vec<Vec<u8>>> {
     match format {
         TextSignFormat::Blake3 => Blake3::generate(),
         TextSignFormat::Ed25519 => Ed25519Signer::generate(),
+    }
+}
+
+pub fn process_text_encrypt(input: &str, key: &str, format: TextEncryptFormat) -> Result<Vec<u8>> {
+    let mut reader = read_data(input)?;
+
+    let encrypted = match format {
+        TextEncryptFormat::ChaCha20Poly1305 => {
+            let signer = ChaCha20::load(key)?;
+            signer.encrypt(&mut reader)?
+        }
+    };
+
+    Ok(encrypted)
+}
+
+pub fn process_text_decrypt(input: &str, key: &str, format: TextEncryptFormat) -> Result<Vec<u8>> {
+    let mut reader = read_data(input)?;
+
+    let decrypted = match format {
+        TextEncryptFormat::ChaCha20Poly1305 => {
+            let signer = ChaCha20::load(key)?;
+            signer.decrypt(&mut reader)?
+        }
+    };
+
+    Ok(decrypted)
+}
+
+pub trait TextSign {
+    fn sign(&self, reader: &mut dyn Read) -> Result<Vec<u8>>;
+}
+
+pub trait TextVerify {
+    fn verify(&self, reader: &mut dyn Read, sig: &[u8]) -> Result<bool>;
+}
+
+pub trait TextEncryptDecrypt {
+    fn encrypt(&self, reader: &mut dyn Read) -> Result<Vec<u8>>;
+    fn decrypt(&self, reader: &mut dyn Read) -> Result<Vec<u8>>;
+}
+
+pub trait KeyLoader {
+    fn load(path: impl AsRef<Path>) -> Result<Self>
+    where
+        Self: Sized;
+}
+
+pub trait KeyGenerator {
+    fn generate() -> Result<Vec<Vec<u8>>>;
+}
+
+pub struct Blake3 {
+    key: [u8; 32],
+}
+
+pub struct Ed25519Signer {
+    key: SigningKey,
+}
+
+pub struct Ed25519Verifier {
+    key: VerifyingKey,
+}
+
+pub struct ChaCha20 {
+    key: Key,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChaCha20EncryptedData {
+    encrypt_data: Vec<u8>,
+    // nonce: Nonce,
+    nonce: Vec<u8>,
+}
+
+impl ChaCha20EncryptedData {
+    fn try_new_from_base64(base_str: String) -> Result<Self> {
+        let base64_decode_str = URL_SAFE_NO_PAD.decode(base_str)?;
+        let encrypted_data: ChaCha20EncryptedData = serde_json::from_slice(&base64_decode_str)?;
+        Ok(encrypted_data)
+    }
+
+    fn to_base64(&self) -> Result<String> {
+        let serialized = serde_json::to_string(self)?;
+        let base64_str = URL_SAFE_NO_PAD.encode(serialized);
+
+        Ok(base64_str)
     }
 }
 
@@ -173,6 +234,47 @@ impl KeyLoader for Ed25519Verifier {
     }
 }
 
+impl TextEncryptDecrypt for ChaCha20 {
+    fn encrypt(&self, reader: &mut dyn Read) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        reader.read_to_end(&mut buf)?;
+
+        let cipher: ChaCha20Poly1305 = ChaCha20Poly1305::new(&self.key);
+        let nonce: Nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng); // 96-bits; unique per message
+        let encrypted = cipher.encrypt(&nonce, &buf as &[u8]).unwrap();
+        let data = ChaCha20EncryptedData {
+            encrypt_data: encrypted,
+            nonce: nonce.to_vec(),
+        }
+        .to_base64()?;
+
+        Ok(data.into_bytes().to_vec())
+    }
+
+    fn decrypt(&self, reader: &mut dyn Read) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        reader.read_to_end(&mut buf)?;
+
+        let base = String::from_utf8(buf)?;
+        let data = ChaCha20EncryptedData::try_new_from_base64(base)?;
+        let cipher: ChaCha20Poly1305 = ChaCha20Poly1305::new(&self.key);
+        let nonce = *Nonce::from_slice(&data.nonce);
+        let plaintext = cipher.decrypt(&nonce, &data.encrypt_data as &[u8]).unwrap();
+
+        Ok(plaintext)
+    }
+}
+
+impl KeyLoader for ChaCha20 {
+    fn load(path: impl AsRef<Path>) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let key = fs::read(path)?;
+        Self::try_new(&key)
+    }
+}
+
 impl Blake3 {
     pub fn new(key: [u8; 32]) -> Self {
         Self { key }
@@ -217,5 +319,19 @@ impl Ed25519Verifier {
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let key = fs::read(path)?;
         Self::try_new(&key)
+    }
+}
+
+impl ChaCha20 {
+    pub fn new(key: Key) -> Self {
+        Self { key }
+    }
+
+    pub fn try_new(key: &[u8]) -> Result<Self> {
+        let key = &key[..32];
+        let key: [u8; 32] = key.try_into()?;
+        let key = Key::from(key);
+        let signer = ChaCha20::new(key);
+        Ok(signer)
     }
 }

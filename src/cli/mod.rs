@@ -13,7 +13,10 @@ pub use self::{
     csv::{CsvOpts, OutputFormat},
     genpass::GenPassOpts,
     http::{HttpSubCommand, ServeOpts},
-    text::{GenerateOpts, TextSignFormat, TextSignOpts, TextSubCommand, TextVerifyOpts},
+    text::{
+        DecryptOpts, EncryptOpts, GenerateOpts, TextEncryptFormat, TextSignFormat, TextSignOpts,
+        TextSubCommand, TextVerifyOpts,
+    },
 };
 
 #[derive(Debug, Parser)]
