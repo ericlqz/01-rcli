@@ -200,7 +200,7 @@ impl CmdExecutor for EncryptOpts {
     async fn execute(self) -> anyhow::Result<()> {
         let encrypted = process_text_encrypt(&self.input, &self.key, self.format)?;
         let encrypted = String::from_utf8(encrypted)?;
-        println!("{}", encrypted);
+        println!("\nEncrypted msg: {}", encrypted);
         Ok(())
     }
 }
@@ -209,7 +209,7 @@ impl CmdExecutor for DecryptOpts {
     async fn execute(self) -> anyhow::Result<()> {
         let decrypted = process_text_decrypt(&self.input, &self.key, self.format)?;
         let decrypted = String::from_utf8(decrypted)?;
-        println!("{}", decrypted);
+        println!("\nDecrypted msg: {}", decrypted);
         Ok(())
     }
 }

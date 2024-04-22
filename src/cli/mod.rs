@@ -2,6 +2,7 @@ mod base64;
 mod csv;
 mod genpass;
 mod http;
+mod jwt;
 mod text;
 
 use clap::Parser;
@@ -13,6 +14,7 @@ pub use self::{
     csv::{CsvOpts, OutputFormat},
     genpass::GenPassOpts,
     http::{HttpSubCommand, ServeOpts},
+    jwt::{JwtSignOpts, JwtSubCommand, JwtVerifyOpts},
     text::{
         DecryptOpts, EncryptOpts, GenerateOpts, TextEncryptFormat, TextSignFormat, TextSignOpts,
         TextSubCommand, TextVerifyOpts,
@@ -43,6 +45,9 @@ pub enum SubCommand {
 
     #[command(subcommand, about = "HTTP server")]
     Http(HttpSubCommand),
+
+    #[command(subcommand, about = "Sign and verify jwt")]
+    Jwt(JwtSubCommand),
 }
 
 pub fn verify_file(file_name: &str) -> Result<String, String> {

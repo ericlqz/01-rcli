@@ -59,7 +59,7 @@ async fn file_handler(
                 let sub_items = list_files_and_directories(p).await.unwrap();
                 let si = sub_items
                     .into_iter()
-                    .map(|i| format!("<li><a href=\"/{}{}\">{}</a></li>", path, i, i))
+                    .map(|i| format!("<li><a href=\"/{}/{}\">{}</a></li>", path, i, i))
                     .collect::<Vec<String>>();
                 let res = format!("<html><body><ul>{}</ul></body></html>", si.join("\n"));
 
