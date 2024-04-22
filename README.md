@@ -1,33 +1,19 @@
 # RCLI
 
-
-
-
-
-
-### 项目依赖
-- ```cargo add clap --features derive```
-    - 开启derive允许使用 #[derive(Clap)] 宏来自动导出命令行参数解析器。可以更轻松地定义和管理命令行参数，从结构体中自动生成相应的解析器。
-    - derive feature依赖`syn`及`quote`两个库，因此不是默认开启的特性
-- ```cargo add serde --features derive```
-- ```cargo add serde-json --features derive```
-- ```cargo add csv```
-
-
-
-### 项目初始化
+## Homework Check
 
 ```bash
-pre-commit install
+rcli genpass -l 32 > fixtures/chacha20.txt
+rcli text encrypt --key fixtures/chacha20.txt # input from stdin
+rcli text decrypt --key fixtures/chacha20.txt # input from stdin
 ```
 
-deny初始化？
 ```bash
-cargo deny init
+rcli jwt sign --sub acme --aud device1 --exp 1m # exp支持 d(day)/h(hour)/m(minute)/s(second)
+rcli jwt verify -t {token}
 ```
 
-
-### 环境要求
-
-开发环境：
-- 可翻墙（pre-commit）
+```bash
+rcli http serve
+# Visit http://0.0.0.0:8080/src
+```
