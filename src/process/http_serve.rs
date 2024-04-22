@@ -18,7 +18,7 @@ struct HttpServeState {
 
 pub async fn process_http_serve(path: PathBuf, port: u16) -> Result<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    info!("Serving {:?} on {}", path, addr);
+    println!("Serving {:?} on http://{}", path, addr);
     let state = HttpServeState { path: path.clone() };
 
     let router = Router::new()

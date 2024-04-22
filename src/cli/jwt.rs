@@ -85,7 +85,7 @@ impl CmdExecutor for JwtSignOpts {
             &claims,
             &EncodingKey::from_secret(self.key.as_ref()),
         )?;
-        debug!("jwt sign token: {:?}", token);
+        println!("jwt sign token: {:?}", token);
         Ok(())
     }
 }
@@ -99,7 +99,7 @@ impl CmdExecutor for JwtVerifyOpts {
             &DecodingKey::from_secret(self.key.as_ref()),
             &validation,
         )?;
-        debug!("jwt verify token: {:?}", token_message.claims);
+        println!("jwt verify token: {:?}", token_message.claims);
         Ok(())
     }
 }

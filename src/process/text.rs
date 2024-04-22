@@ -236,12 +236,16 @@ impl KeyLoader for Ed25519Verifier {
 
 impl TextEncryptDecrypt for ChaCha20 {
     fn encrypt(&self, reader: &mut dyn Read) -> Result<Vec<u8>> {
-        let mut buf = Vec::new();
-        reader.read_to_end(&mut buf)?;
+        // let mut buf = Vec::new();
+        // reader.read_to_end(&mut buf)?;
+
+        let mut buf = String::new();
+        reader.read_to_string(&mut buf)?;
+        let buf = buf.trim(); // 去除多余的换行符
 
         let cipher: ChaCha20Poly1305 = ChaCha20Poly1305::new(&self.key);
         let nonce: Nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng); // 96-bits; unique per message
-        let encrypted = cipher.encrypt(&nonce, &buf as &[u8]).unwrap();
+        let encrypted = cipher.encrypt(&nonce, &buf.as_bytes() as &[u8]).unwrap();
         let data = ChaCha20EncryptedData {
             encrypt_data: encrypted,
             nonce: nonce.to_vec(),
@@ -256,6 +260,7 @@ impl TextEncryptDecrypt for ChaCha20 {
         reader.read_to_end(&mut buf)?;
 
         let base = String::from_utf8(buf)?;
+        let base = base.trim().to_string();
         let data = ChaCha20EncryptedData::try_new_from_base64(base)?;
         let cipher: ChaCha20Poly1305 = ChaCha20Poly1305::new(&self.key);
         let nonce = *Nonce::from_slice(&data.nonce);
